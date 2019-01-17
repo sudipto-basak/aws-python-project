@@ -2,10 +2,13 @@
 # -*- coding: utf-8 -*-
 """Classes for S3 bucket."""
 
+import boto3
 from botocore.exceptions import ClientError
 import mimetypes
 from pathlib import Path
 from builtins import staticmethod
+from hashlib import md5
+from functools import reduce
 
 import utils
 
@@ -13,10 +16,73 @@ import utils
 class BucketManager:
     """Manage and S3 bucket."""
 
+    CHUNK_SIZE = 8388608
+
     def __init__(self, session):
         """Create a BucketManager object."""
         self.session = session
         self.s3 = self.session.resource("s3")
+        self.transfer_config = boto3.s3.transfer.TransferConfig(
+            multipart_threshold=self.CHUNK_SIZE,
+            multipart_chunksize=self.CHUNK_SIZE
+        )
+
+        self.manifest = {}
+
+    @staticmethod
+    def hash_data(data):
+        """Get md5 hash of data."""
+        hash = md5()
+        hash.update(data)
+
+        return hash
+
+    def load_manifest(self, bucketname):
+        """Load manifest for a bucket."""
+        paginator = self.s3.meta.client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucketname):
+            for obj in page.get('Contents', []):
+                self.manifest[obj['Key']] = obj['ETag']
+
+    def gen_etag(self, path):
+        """Generate ETag for local pathname."""
+        hashes = []
+
+        with open(path, 'rb') as f:
+            while True:
+                data = f.read(self.CHUNK_SIZE)
+
+                if not data:
+                    break
+
+                hashes.append(self.hash_data(data))
+
+        if not hashes:
+            return
+        elif len(hashes) == 1:
+            return '"{}"'.format(hashes[0].hexdigest())
+        else:
+            digest = (h.digest() for h in hashes)
+            hash = self.hash_data(reduce(lambda x, y: x + y, digest))
+            return '"{}"'.format(hash.hexdigest(), len(hashes))
+
+    def upload_file(self, bucket, path, key):
+        """Upload content to S3."""
+        content_type = mimetypes.guess_type(key)[0] or 'text/plain'
+
+        etag = self.gen_etag(path)
+        if self.manifest.get(key, '') == etag:
+            # print("Skipping {}, no change detected".format(key))
+            return
+
+        return bucket.upload_file(
+            path,
+            key,
+            ExtraArgs={
+                'ContentType': content_type
+                },
+            Config=self.transfer_config
+            )
 
     def get_bucket_location(self, bucketname):
         """Return the location of the bucket."""
@@ -93,22 +159,10 @@ class BucketManager:
 
         return
 
-    @staticmethod
-    def upload_file(bucket, path, key):
-        """Upload content to S3."""
-        content_type = mimetypes.guess_type(key)[0] or 'text/plain'
-        bucket.upload_file(
-            path,
-            key,
-            ExtraArgs={
-                'ContentType': content_type
-                })
-
-        return
-
     def sync(self, bucket_name, pathname):
         """Sync s3 bucket with local filesystem path."""
         bucket = self.s3.Bucket(bucket_name)
+        self.load_manifest(bucket_name)
         root = Path(pathname)
 
         def handle_directory(target):
@@ -123,5 +177,5 @@ class BucketManager:
                         )
 
         handle_directory(root)
-        print(self.get_bucket_url(bucket.name))
+        print("Website URL: {}".format(self.get_bucket_url(bucket.name)))
         return

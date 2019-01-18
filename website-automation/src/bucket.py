@@ -28,6 +28,7 @@ class BucketManager:
         )
 
         self.manifest = {}
+        self.local_set = set()
 
     @staticmethod
     def hash_data(data):
@@ -90,7 +91,7 @@ class BucketManager:
 
     def get_bucket_url(self, bucketname):
         """Get URL for a bucket."""
-        return "http://{}.{}".format(bucketname,utils.get_endpoint(self.get_bucket_location(bucketname)).host)
+        return "http://{}.{}".format(bucketname, utils.get_endpoint(self.get_bucket_location(bucketname)).host)
 
     def all_buckets(self):
         """Get Iterator of all S3 buckets."""
@@ -170,6 +171,7 @@ class BucketManager:
                 if p.is_dir():
                     handle_directory(p)
                 if p.is_file():
+                    self.local_set.add(p.relative_to(root).as_posix())
                     self.upload_file(
                         bucket,
                         str(p.as_posix()),
@@ -177,5 +179,25 @@ class BucketManager:
                         )
 
         handle_directory(root)
+        # print(self.local_set)
+        # print(set(self.manifest))
+        self.remove_extra_files_from_s3(
+            bucket,
+            set(self.manifest).difference(self.local_set)
+        )
+
         print("Website URL: {}".format(self.get_bucket_url(bucket.name)))
         return
+
+    def remove_extra_files_from_s3(self, bucket, keyset):
+        """Remove files from s3 which is not present in local."""
+        keylist = list([{'Key': key} for key in keyset])
+        # print(keylist)
+        if keylist:
+            response = bucket.delete_objects(
+                Delete={
+                    'Objects': keylist
+                }
+            )
+
+            # print(response)

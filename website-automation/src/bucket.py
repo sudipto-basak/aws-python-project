@@ -10,7 +10,7 @@ from builtins import staticmethod
 from hashlib import md5
 from functools import reduce
 
-import utils
+from src import utils
 
 
 class BucketManager:

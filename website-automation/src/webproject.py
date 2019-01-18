@@ -17,7 +17,7 @@ Webproject automates the deployment of static websites in S3
 
 import boto3
 import click
-from bucket import BucketManager
+from src.bucket import BucketManager
 
 session = None
 bucket_manager = None

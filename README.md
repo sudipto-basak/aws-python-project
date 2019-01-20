@@ -16,3 +16,11 @@ website-automation currently has the following features:
 - Sync directory tree to bucket
 - Set AWS profile with --profile=<profileName>
 - Configure route 53 domain
+
+## autonotif
+
+**autonotif** is an automated notification system driven by Cloudwatch metrics
+
+#### features
+
+Not yet

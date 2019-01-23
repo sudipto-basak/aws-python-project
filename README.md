@@ -23,4 +23,4 @@ website-automation currently has the following features:
 
 #### features
 
-Not yet
+ - Send notification to Slack for an Autoscaling event

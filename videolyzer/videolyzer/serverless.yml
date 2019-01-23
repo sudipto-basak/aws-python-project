@@ -7,6 +7,31 @@ provider:
   profile: ${file(../config.${self:provider.stage}.json):videolyzer.profile}
   region: ${file(../config.${self:provider.stage}.json):videolyzer.region}
 
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "rekognition:*"
+      Resource: "*"
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource:
+        - Fn::Join:
+          - ''
+          - - ${self:custom.bucketArn}
+            - '/*'
+
+custom:
+  bucketArn:
+    Fn::Join:
+      - ":"
+      - - arn
+        - aws
+        - s3
+        - ''
+        - ''
+        - ${file(../config.${self:provider.stage}.json):videolyzer.videos_bucket}
+
 
 functions:
   startProcessingVideo:

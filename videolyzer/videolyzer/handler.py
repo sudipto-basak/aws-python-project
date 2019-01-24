@@ -1,5 +1,6 @@
 import urllib
 import boto3
+import os
 
 
 def start_label_detection(bucketname, key):
@@ -11,6 +12,10 @@ def start_label_detection(bucketname, key):
                 'Bucket': bucketname,
                 'Name': key
             }
+        },
+        NotificationChannel={
+            'SNSTopicArn': os.environ['REKOGNITION_SNS_TOPIC_ARN'],
+            'RoleArn': os.environ['REKOGNITION_ROLE_ARN']
         })
 
     print(response)
@@ -23,5 +28,10 @@ def start_processing_video(event, context):
             record['s3']['bucket']['name'],
             urllib.parse.unquote_plus(record['s3']['object']['key'])
         )
+
+    return
+
+def handle_lable_detection(event, context):
+    print(event)
 
     return
